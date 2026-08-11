@@ -20,8 +20,24 @@ async function rateLimit(kv: KVNamespace, key: string, limit: number, windowSec:
   await kv.put(k, JSON.stringify(st), { expirationTtl: windowSec * 2 }); return true;
 }
 
+function timingSafeEqual(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b) return false;
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  const len = Math.max(bufA.length, bufB.length, 1);
+  const padA = new Uint8Array(len);
+  const padB = new Uint8Array(len);
+  padA.set(bufA);
+  padB.set(bufB);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < len; i++) diff |= padA[i] ^ padB[i];
+  return diff === 0;
+}
+
 function authOk(req: Request, env: Env): boolean {
-  return (req.headers.get('X-Echo-API-Key') || req.headers.get('Authorization')?.replace('Bearer ', '') || '') === env.ECHO_API_KEY;
+  const key = req.headers.get('X-Echo-API-Key') || req.headers.get('Authorization')?.replace('Bearer ', '');
+  return timingSafeEqual(key, env.ECHO_API_KEY);
 }
 
 function slog(level: string, msg: string, data?: Record<string, any>) {
